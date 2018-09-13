@@ -527,14 +527,14 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
   gsp_->setUpdateDistances(linearUpdate_, angularUpdate_, resampleThreshold_);
   gsp_->setUpdatePeriod(temporalUpdate_);
   gsp_->setgenerateMap(false);
-  gsp_->setpureLocalization(false);
+  gsp_->setpureLocalization(pure_localization_);
   // if(!pure_localization_)
     gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
                                   delta_, initialPose);
   // else;
   //   // gsp_->GridSlamProcessor::init(smap, particles_, initialPose);
 
-  // loadMap(static_map_filename_);
+  loadMap(static_map_filename_);
   // convertMap(static_map_, static_smap_);
   // gsp_->init(*static_smap_, particles_, initialPose);
   
