@@ -529,15 +529,15 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
   gsp_->setUpdatePeriod(temporalUpdate_);
   gsp_->setgenerateMap(false);
   gsp_->setpureLocalization(pure_localization_);
-  // if(!pure_localization_)
-    // gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
-                                  // delta_, initialPose);
-  // else;
-  //   // gsp_->GridSlamProcessor::init(smap, particles_, initialPose);
+  if(!pure_localization_)
+    gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
+                                  delta_, initialPose);
+  else {
+    loadMap(static_map_filename_);
+    convertMap(static_map_, static_smap_);
+    gsp_->init(*static_smap_, particles_, initialPose);
+  }
 
-  loadMap(static_map_filename_);
-  convertMap(static_map_, static_smap_);
-  gsp_->init(*static_smap_, particles_, initialPose);
   
   gsp_->setllsamplerange(llsamplerange_);
   gsp_->setllsamplestep(llsamplestep_);

@@ -106,7 +106,7 @@ private:
   {
     ROS_INFO("fname is :%s", fname.c_str());
     double origin[] = {0., 0., 0.};
-    map_server::loadMapFromFile(&static_map_, fname.c_str(), delta_, false, occ_thresh_, occ_thresh_, origin);
+    map_server::loadMapFromFile(&static_map_, fname.c_str(), delta_, false, 0.65, 0.196, origin, TRINARY);
     ROS_INFO("Received a %d X %d map @ %.3f m/pix",
                static_map_.map.info.width,
                static_map_.map.info.height,
@@ -121,26 +121,26 @@ private:
 
     ROS_INFO("begin converting map");
     smap = new GMapping::ScanMatcherMap(width, height, delta);
+    ROS_INFO("%d xxx  %d", smap->getMapSizeX(), smap->getMapSizeY());
+    ROS_INFO("%d xxx  %d", width, height);
     for (int x = 0; x < smap->getMapSizeX(); x++)
     {
       for (int y = 0; y < smap->getMapSizeY(); y++)
       {
         /// @todo Sort out the unknown vs. free vs. obstacle thresholding
         GMapping::IntPoint p(x, y);
-        ROS_INFO("is_inside %d", smap->isInside(p));
-
         GMapping::PointAccumulator &cell = smap->cell(p);
 
         #define MAP_IDX(sx, i, j) ((sx) * (j) + (i))
-        if (map.map.data[MAP_IDX(map_.map.info.width, x, y)] == -1)
+        if (map.map.data[MAP_IDX(map.map.info.width, x, y)] ==  -1)
         {
           cell.visits = 0;
         }
-        else if (map.map.data[MAP_IDX(map_.map.info.width, x, y)] == 100)
+        else if (map.map.data[MAP_IDX(map.map.info.width, x, y)] == +100)
         {
           cell.update(true, smap->map2world(x, y));
         }
-        else if (map.map.data[MAP_IDX(map_.map.info.width, x, y)] == 0)
+        else if (map.map.data[MAP_IDX(map.map.info.width, x, y)] == 0)
         {
           cell.update(false, GMapping::Point(0, 0));
         }
