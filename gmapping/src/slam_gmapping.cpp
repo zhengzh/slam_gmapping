@@ -612,8 +612,8 @@ SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoin
             */
   ROS_DEBUG("processing scan");
 
-  return gsp_->processScan(reading);
   add_scan_mutex_.unlock();
+  return gsp_->processScan(reading);
 }
 
 void
@@ -722,26 +722,26 @@ SlamGMapping::updateMap(const sensor_msgs::LaserScan& scan)
   GMapping::ScanMatcherMap smap(center, xmin_, ymin_, xmax_, ymax_, 
                                 delta_);
 
-  // ROS_DEBUG("Trajectory tree:");
-  // for(GMapping::GridSlamProcessor::TNode* n = best.node;
-  //     n;
-  //     n = n->parent)
-  // {
-  //   ROS_DEBUG("  %.3f %.3f %.3f",
-  //             n->pose.x,
-  //             n->pose.y,
-  //             n->pose.theta);
-  //   if(!n->reading)
-  //   {
-  //     ROS_DEBUG("Reading is NULL");
-  //     continue;
-  //   }
-  //   matcher.invalidateActiveArea();
-  //   matcher.computeActiveArea(smap, n->pose, &((*n->reading)[0]));
-  //   matcher.registerScan(smap, n->pose, &((*n->reading)[0]));
-  // }
+  ROS_DEBUG("Trajectory tree:");
+  for(GMapping::GridSlamProcessor::TNode* n = best.node;
+      n;
+      n = n->parent)
+  {
+    ROS_DEBUG("  %.3f %.3f %.3f",
+              n->pose.x,
+              n->pose.y,
+              n->pose.theta);
+    if(!n->reading)
+    {
+      ROS_DEBUG("Reading is NULL");
+      continue;
+    }
+    matcher.invalidateActiveArea();
+    matcher.computeActiveArea(smap, n->pose, &((*n->reading)[0]));
+    matcher.registerScan(smap, n->pose, &((*n->reading)[0]));
+  }
 
-  smap = gsp_->getParticles()[gsp_->getBestParticleIndex()].map;
+  // smap = gsp_->getParticles()[gsp_->getBestParticleIndex()].map;
 
   // the map may have expanded, so resize ros message as well
   if(map_.map.info.width != (unsigned int) smap.getMapSizeX() || map_.map.info.height != (unsigned int) smap.getMapSizeY()) {
