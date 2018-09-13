@@ -28,113 +28,169 @@
 #include "gmapping/gridfastslam/gridslamprocessor.h"
 #include "gmapping/sensor/sensor_base/sensor.h"
 
+#include "nav_msgs/GetMap.h"
+#include <map_server/image_loader.h>
 #include <boost/thread.hpp>
 
 class SlamGMapping
 {
-  public:
-    SlamGMapping();
-    SlamGMapping(ros::NodeHandle& nh, ros::NodeHandle& pnh);
-    SlamGMapping(unsigned long int seed, unsigned long int max_duration_buffer);
-    ~SlamGMapping();
+public:
+  SlamGMapping();
+  SlamGMapping(ros::NodeHandle &nh, ros::NodeHandle &pnh);
+  SlamGMapping(unsigned long int seed, unsigned long int max_duration_buffer);
+  ~SlamGMapping();
 
-    void init();
-    void startLiveSlam();
-    void startReplay(const std::string & bag_fname, std::string scan_topic);
-    void publishTransform();
-  
-    void laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan);
-    bool mapCallback(nav_msgs::GetMap::Request  &req,
-                     nav_msgs::GetMap::Response &res);
-    void publishLoop(double transform_publish_period);
+  void init();
+  void startLiveSlam();
+  void startReplay(const std::string &bag_fname, std::string scan_topic);
+  void publishTransform();
 
-  private:
-    ros::NodeHandle node_;
-    ros::Publisher entropy_publisher_;
-    ros::Publisher sst_;
-    ros::Publisher sstm_;
-    ros::ServiceServer ss_;
-    tf::TransformListener tf_;
-    message_filters::Subscriber<sensor_msgs::LaserScan>* scan_filter_sub_;
-    tf::MessageFilter<sensor_msgs::LaserScan>* scan_filter_;
-    tf::TransformBroadcaster* tfB_;
+  void laserCallback(const sensor_msgs::LaserScan::ConstPtr &scan);
+  bool mapCallback(nav_msgs::GetMap::Request &req,
+                   nav_msgs::GetMap::Response &res);
+  void publishLoop(double transform_publish_period);
 
-    GMapping::GridSlamProcessor* gsp_;
-    GMapping::RangeSensor* gsp_laser_;
-    // The angles in the laser, going from -x to x (adjustment is made to get the laser between
-    // symmetrical bounds as that's what gmapping expects)
-    std::vector<double> laser_angles_;
-    // The pose, in the original laser frame, of the corresponding centered laser with z facing up
-    tf::Stamped<tf::Pose> centered_laser_pose_;
-    // Depending on the order of the elements in the scan and the orientation of the scan frame,
-    // We might need to change the order of the scan
-    bool do_reverse_range_;
-    unsigned int gsp_laser_beam_count_;
-    GMapping::OdometrySensor* gsp_odom_;
+private:
+  ros::NodeHandle node_;
+  ros::Publisher entropy_publisher_;
+  ros::Publisher sst_;
+  ros::Publisher sstm_;
+  ros::ServiceServer ss_;
+  tf::TransformListener tf_;
+  message_filters::Subscriber<sensor_msgs::LaserScan> *scan_filter_sub_;
+  tf::MessageFilter<sensor_msgs::LaserScan> *scan_filter_;
+  tf::TransformBroadcaster *tfB_;
 
-    bool got_first_scan_;
+  GMapping::GridSlamProcessor *gsp_;
+  GMapping::RangeSensor *gsp_laser_;
+  // The angles in the laser, going from -x to x (adjustment is made to get the laser between
+  // symmetrical bounds as that's what gmapping expects)
+  std::vector<double> laser_angles_;
+  // The pose, in the original laser frame, of the corresponding centered laser with z facing up
+  tf::Stamped<tf::Pose> centered_laser_pose_;
+  // Depending on the order of the elements in the scan and the orientation of the scan frame,
+  // We might need to change the order of the scan
+  bool do_reverse_range_;
+  unsigned int gsp_laser_beam_count_;
+  GMapping::OdometrySensor *gsp_odom_;
 
-    bool got_map_;
-    nav_msgs::GetMap::Response map_;
+  bool got_first_scan_;
 
-    ros::Duration map_update_interval_;
-    tf::Transform map_to_odom_;
-    boost::mutex map_to_odom_mutex_;
-    boost::mutex map_mutex_;
+  bool got_map_;
+  nav_msgs::GetMap::Response map_;
 
-    int laser_count_;
-    int throttle_scans_;
+  ros::Duration map_update_interval_;
+  tf::Transform map_to_odom_;
+  boost::mutex map_to_odom_mutex_;
+  boost::mutex map_mutex_;
 
-    boost::thread* transform_thread_;
+  int laser_count_;
+  int throttle_scans_;
 
-    std::string base_frame_;
-    std::string laser_frame_;
-    std::string map_frame_;
-    std::string odom_frame_;
+  boost::thread *transform_thread_;
+  bool enable_transform_thread_;
+  bool enable_addScan_;
+  boost::mutex add_scan_mutex_;
 
-    void updateMap(const sensor_msgs::LaserScan& scan);
-    bool getOdomPose(GMapping::OrientedPoint& gmap_pose, const ros::Time& t);
-    bool initMapper(const sensor_msgs::LaserScan& scan);
-    bool addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose);
-    double computePoseEntropy();
-    
-    // Parameters used by GMapping
-    double maxRange_;
-    double maxUrange_;
-    double maxrange_;
-    double minimum_score_;
-    double sigma_;
-    int kernelSize_;
-    double lstep_;
-    double astep_;
-    int iterations_;
-    double lsigma_;
-    double ogain_;
-    int lskip_;
-    double srr_;
-    double srt_;
-    double str_;
-    double stt_;
-    double linearUpdate_;
-    double angularUpdate_;
-    double temporalUpdate_;
-    double resampleThreshold_;
-    int particles_;
-    double xmin_;
-    double ymin_;
-    double xmax_;
-    double ymax_;
-    double delta_;
-    double occ_thresh_;
-    double llsamplerange_;
-    double llsamplestep_;
-    double lasamplerange_;
-    double lasamplestep_;
-    
-    ros::NodeHandle private_nh_;
-    
-    unsigned long int seed_;
-    
-    double transform_publish_period_;
-    double tf_delay_;
+  std::string base_frame_;
+  std::string laser_frame_;
+  std::string map_frame_;
+  std::string odom_frame_;
+
+  nav_msgs::GetMap::Response static_map_;
+
+  void test();
+  inline void loadMap(std::string fname)
+  {
+    double origin[] = {0., 0., 0.};
+    map_server::loadMapFromFile(&static_map_, fname.c_str(), delta_, false, occ_thresh_, occ_thresh_, origin);
+  }
+
+  inline void convertMap(nav_msgs::GetMap::Response &map)
+  {
+
+    int width = map.map.info.width, height = map.map.info.height;
+    double delta = map.map.info.resolution;
+
+    GMapping::ScanMatcherMap smap(width, height, delta);
+    for (int x = 0; x < smap.getMapSizeX(); x++)
+    {
+      for (int y = 0; y < smap.getMapSizeY(); y++)
+      {
+        /// @todo Sort out the unknown vs. free vs. obstacle thresholding
+        GMapping::IntPoint p(x, y);
+
+        GMapping::PointAccumulator &cell = smap.cell(p);
+
+        #define MAP_IDX(sx, i, j) ((sx) * (j) + (i))
+        if (map_.map.data[MAP_IDX(map_.map.info.width, x, y)] == -1)
+        {
+        }
+        else if (map_.map.data[MAP_IDX(map_.map.info.width, x, y)] == 100)
+        {
+          cell.update(true, smap.map2world(x, y));
+        }
+        else if (map_.map.data[MAP_IDX(map_.map.info.width, x, y)] == 0)
+        {
+          cell.update(false, GMapping::Point(0, 0));
+        }
+      }
+    }
+
+    //make sure to set the header information on the map
+    map_.map.header.stamp = ros::Time::now();
+    map_.map.header.frame_id = tf_.resolve(map_frame_);
+
+    sst_.publish(map_.map);
+    sstm_.publish(map_.map.info);
+  }
+  void updateMap(const sensor_msgs::LaserScan &scan);
+  bool getOdomPose(GMapping::OrientedPoint &gmap_pose, const ros::Time &t);
+  bool initMapper(const sensor_msgs::LaserScan &scan);
+  bool addScan(const sensor_msgs::LaserScan &scan, GMapping::OrientedPoint &gmap_pose);
+  double computePoseEntropy();
+  void stopThread();
+  void startThread();
+  void processCmd(std::string cmd);
+
+  // Parameters used by GMapping
+  double maxRange_;
+  double maxUrange_;
+  double maxrange_;
+  double minimum_score_;
+  double sigma_;
+  int kernelSize_;
+  double lstep_;
+  double astep_;
+  int iterations_;
+  double lsigma_;
+  double ogain_;
+  int lskip_;
+  double srr_;
+  double srt_;
+  double str_;
+  double stt_;
+  double linearUpdate_;
+  double angularUpdate_;
+  double temporalUpdate_;
+  double resampleThreshold_;
+  int particles_;
+  double xmin_;
+  double ymin_;
+  double xmax_;
+  double ymax_;
+  double delta_;
+  double occ_thresh_;
+  double llsamplerange_;
+  double llsamplestep_;
+  double lasamplerange_;
+  double lasamplestep_;
+
+  ros::NodeHandle private_nh_;
+
+  unsigned long int seed_;
+
+  double transform_publish_period_;
+  double tf_delay_;
+  bool pure_localization_;
 };

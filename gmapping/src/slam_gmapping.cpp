@@ -128,7 +128,8 @@ Initial map dimensions and resolution:
 
 SlamGMapping::SlamGMapping():
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
-  laser_count_(0), private_nh_("~"), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL)
+  laser_count_(0), private_nh_("~"), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
+  enable_transform_thread_(true), enable_addScan_(true)
 {
   seed_ = time(NULL);
   init();
@@ -136,7 +137,8 @@ SlamGMapping::SlamGMapping():
 
 SlamGMapping::SlamGMapping(ros::NodeHandle& nh, ros::NodeHandle& pnh):
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
-  laser_count_(0),node_(nh), private_nh_(pnh), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL)
+  laser_count_(0),node_(nh), private_nh_(pnh), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
+  enable_transform_thread_(true), enable_addScan_(true)
 {
   seed_ = time(NULL);
   init();
@@ -145,7 +147,7 @@ SlamGMapping::SlamGMapping(ros::NodeHandle& nh, ros::NodeHandle& pnh):
 SlamGMapping::SlamGMapping(long unsigned int seed, long unsigned int max_duration_buffer):
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
   laser_count_(0), private_nh_("~"), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
-  seed_(seed), tf_(ros::Duration(max_duration_buffer))
+  seed_(seed), tf_(ros::Duration(max_duration_buffer)), enable_transform_thread_(true), enable_addScan_(true)
 {
   init();
 }
@@ -250,8 +252,14 @@ void SlamGMapping::init()
   if(!private_nh_.getParam("tf_delay", tf_delay_))
     tf_delay_ = transform_publish_period_;
 
+  if(!private_nh_.getParam("pure_localization", pure_localization_))
+    pure_localization_ = false;
 }
 
+// void SlamGMapping::map_received()
+// {
+  
+// }
 
 void SlamGMapping::startLiveSlam()
 {
@@ -349,6 +357,7 @@ void SlamGMapping::publishLoop(double transform_publish_period){
 
 SlamGMapping::~SlamGMapping()
 {
+  enable_transform_thread_ = false;
   if(transform_thread_){
     transform_thread_->join();
     delete transform_thread_;
@@ -514,9 +523,13 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
   gsp_->setMotionModelParameters(srr_, srt_, str_, stt_);
   gsp_->setUpdateDistances(linearUpdate_, angularUpdate_, resampleThreshold_);
   gsp_->setUpdatePeriod(temporalUpdate_);
-  gsp_->setgenerateMap(false);
-  gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
-                                delta_, initialPose);
+  gsp_->setgenerateMap(true);
+  gsp_->setpureLocalization(true);
+  if(!pure_localization_)
+    gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
+                                  delta_, initialPose);
+  else;
+    // gsp_->GridSlamProcessor::init(smap, particles_, initialPose);    
   gsp_->setllsamplerange(llsamplerange_);
   gsp_->setllsamplestep(llsamplestep_);
   /// @todo Check these calls; in the gmapping gui, they use
@@ -537,6 +550,7 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
 bool
 SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoint& gmap_pose)
 {
+  add_scan_mutex_.lock();
   if(!getOdomPose(gmap_pose, scan.header.stamp))
      return false;
   
@@ -591,11 +605,13 @@ SlamGMapping::addScan(const sensor_msgs::LaserScan& scan, GMapping::OrientedPoin
   ROS_DEBUG("processing scan");
 
   return gsp_->processScan(reading);
+  add_scan_mutex_.unlock();
 }
 
 void
 SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 {
+  if(!enable_addScan_) return;
   laser_count_++;
   if ((laser_count_ % throttle_scans_) != 0)
     return;
@@ -698,24 +714,26 @@ SlamGMapping::updateMap(const sensor_msgs::LaserScan& scan)
   GMapping::ScanMatcherMap smap(center, xmin_, ymin_, xmax_, ymax_, 
                                 delta_);
 
-  ROS_DEBUG("Trajectory tree:");
-  for(GMapping::GridSlamProcessor::TNode* n = best.node;
-      n;
-      n = n->parent)
-  {
-    ROS_DEBUG("  %.3f %.3f %.3f",
-              n->pose.x,
-              n->pose.y,
-              n->pose.theta);
-    if(!n->reading)
-    {
-      ROS_DEBUG("Reading is NULL");
-      continue;
-    }
-    matcher.invalidateActiveArea();
-    matcher.computeActiveArea(smap, n->pose, &((*n->reading)[0]));
-    matcher.registerScan(smap, n->pose, &((*n->reading)[0]));
-  }
+  // ROS_DEBUG("Trajectory tree:");
+  // for(GMapping::GridSlamProcessor::TNode* n = best.node;
+  //     n;
+  //     n = n->parent)
+  // {
+  //   ROS_DEBUG("  %.3f %.3f %.3f",
+  //             n->pose.x,
+  //             n->pose.y,
+  //             n->pose.theta);
+  //   if(!n->reading)
+  //   {
+  //     ROS_DEBUG("Reading is NULL");
+  //     continue;
+  //   }
+  //   matcher.invalidateActiveArea();
+  //   matcher.computeActiveArea(smap, n->pose, &((*n->reading)[0]));
+  //   matcher.registerScan(smap, n->pose, &((*n->reading)[0]));
+  // }
+
+  smap = gsp_->getParticles()[gsp_->getBestParticleIndex()].map;
 
   // the map may have expanded, so resize ros message as well
   if(map_.map.info.width != (unsigned int) smap.getMapSizeX() || map_.map.info.height != (unsigned int) smap.getMapSizeY()) {
@@ -788,4 +806,8 @@ void SlamGMapping::publishTransform()
   ros::Time tf_expiration = ros::Time::now() + ros::Duration(tf_delay_);
   tfB_->sendTransform( tf::StampedTransform (map_to_odom_, tf_expiration, map_frame_, odom_frame_));
   map_to_odom_mutex_.unlock();
+}
+
+void test() {
+  loadMap()
 }
