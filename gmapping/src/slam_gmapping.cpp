@@ -129,7 +129,7 @@ Initial map dimensions and resolution:
 SlamGMapping::SlamGMapping():
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
   laser_count_(0), private_nh_("~"), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
-  enable_transform_thread_(true), enable_addScan_(true)
+  enable_transform_thread_(true), enable_addScan_(true), static_smap_(NULL)
 {
   seed_ = time(NULL);
   init();
@@ -138,7 +138,7 @@ SlamGMapping::SlamGMapping():
 SlamGMapping::SlamGMapping(ros::NodeHandle& nh, ros::NodeHandle& pnh):
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
   laser_count_(0),node_(nh), private_nh_(pnh), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
-  enable_transform_thread_(true), enable_addScan_(true)
+  enable_transform_thread_(true), enable_addScan_(true), static_smap_(NULL)
 {
   seed_ = time(NULL);
   init();
@@ -147,7 +147,8 @@ SlamGMapping::SlamGMapping(ros::NodeHandle& nh, ros::NodeHandle& pnh):
 SlamGMapping::SlamGMapping(long unsigned int seed, long unsigned int max_duration_buffer):
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
   laser_count_(0), private_nh_("~"), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
-  seed_(seed), tf_(ros::Duration(max_duration_buffer)), enable_transform_thread_(true), enable_addScan_(true)
+  seed_(seed), tf_(ros::Duration(max_duration_buffer)), enable_transform_thread_(true), enable_addScan_(true),
+  static_smap_(NULL)
 {
   init();
 }
@@ -535,7 +536,7 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
   //   // gsp_->GridSlamProcessor::init(smap, particles_, initialPose);
 
   loadMap(static_map_filename_);
-  // convertMap(static_map_, static_smap_);
+  convertMap(static_map_, static_smap_);
   // gsp_->init(*static_smap_, particles_, initialPose);
   
   gsp_->setllsamplerange(llsamplerange_);

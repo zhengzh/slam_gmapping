@@ -119,14 +119,15 @@ private:
     int width = map.map.info.width, height = map.map.info.height;
     double delta = map.map.info.resolution;
 
+    ROS_INFO("begin converting map");
     smap = new GMapping::ScanMatcherMap(width, height, delta);
-
     for (int x = 0; x < smap->getMapSizeX(); x++)
     {
       for (int y = 0; y < smap->getMapSizeY(); y++)
       {
         /// @todo Sort out the unknown vs. free vs. obstacle thresholding
         GMapping::IntPoint p(x, y);
+        ROS_INFO("is_inside %d", smap->isInside(p));
 
         GMapping::PointAccumulator &cell = smap->cell(p);
 
