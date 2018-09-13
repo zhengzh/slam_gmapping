@@ -530,14 +530,14 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
   gsp_->setgenerateMap(false);
   gsp_->setpureLocalization(pure_localization_);
   // if(!pure_localization_)
-    gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
-                                  delta_, initialPose);
+    // gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
+                                  // delta_, initialPose);
   // else;
   //   // gsp_->GridSlamProcessor::init(smap, particles_, initialPose);
 
   loadMap(static_map_filename_);
   convertMap(static_map_, static_smap_);
-  // gsp_->init(*static_smap_, particles_, initialPose);
+  gsp_->init(*static_smap_, particles_, initialPose);
   
   gsp_->setllsamplerange(llsamplerange_);
   gsp_->setllsamplestep(llsamplestep_);
@@ -742,7 +742,7 @@ SlamGMapping::updateMap(const sensor_msgs::LaserScan& scan)
     matcher.registerScan(smap, n->pose, &((*n->reading)[0]));
   }
 
-  // smap = gsp_->getParticles()[gsp_->getBestParticleIndex()].map;
+  smap = gsp_->getParticles()[gsp_->getBestParticleIndex()].map;
 
   // the map may have expanded, so resize ros message as well
   if(map_.map.info.width != (unsigned int) smap.getMapSizeX() || map_.map.info.height != (unsigned int) smap.getMapSizeY()) {

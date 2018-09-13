@@ -113,7 +113,7 @@ private:
                static_map_.map.info.resolution);
   }
 
-  inline void convertMap(nav_msgs::GetMap::Response &map, GMapping::ScanMatcherMap *smap)
+  inline void convertMap(nav_msgs::GetMap::Response &map, GMapping::ScanMatcherMap *&smap)
   {
     delete smap;
     int width = map.map.info.width, height = map.map.info.height;
