@@ -97,52 +97,55 @@ private:
   std::string map_frame_;
   std::string odom_frame_;
 
+  std::string static_map_filename_;
   nav_msgs::GetMap::Response static_map_;
+  GMapping::ScanMatcherMap *static_smap_;
 
   void test();
   inline void loadMap(std::string fname)
   {
+    ROS_INFO("fname is :%s", fname.c_str());
     double origin[] = {0., 0., 0.};
     map_server::loadMapFromFile(&static_map_, fname.c_str(), delta_, false, occ_thresh_, occ_thresh_, origin);
+    ROS_INFO("Received a %d X %d map @ %.3f m/pix",
+               static_map_.map.info.width,
+               static_map_.map.info.height,
+               static_map_.map.info.resolution);
   }
 
-  inline void convertMap(nav_msgs::GetMap::Response &map)
+  inline void convertMap(nav_msgs::GetMap::Response &map, GMapping::ScanMatcherMap *smap)
   {
-
+    delete smap;
     int width = map.map.info.width, height = map.map.info.height;
     double delta = map.map.info.resolution;
 
-    GMapping::ScanMatcherMap smap(width, height, delta);
-    for (int x = 0; x < smap.getMapSizeX(); x++)
+    smap = new GMapping::ScanMatcherMap(width, height, delta);
+
+    for (int x = 0; x < smap->getMapSizeX(); x++)
     {
-      for (int y = 0; y < smap.getMapSizeY(); y++)
+      for (int y = 0; y < smap->getMapSizeY(); y++)
       {
         /// @todo Sort out the unknown vs. free vs. obstacle thresholding
         GMapping::IntPoint p(x, y);
 
-        GMapping::PointAccumulator &cell = smap.cell(p);
+        GMapping::PointAccumulator &cell = smap->cell(p);
 
         #define MAP_IDX(sx, i, j) ((sx) * (j) + (i))
-        if (map_.map.data[MAP_IDX(map_.map.info.width, x, y)] == -1)
+        if (map.map.data[MAP_IDX(map_.map.info.width, x, y)] == -1)
         {
+          cell.visits = 0;
         }
-        else if (map_.map.data[MAP_IDX(map_.map.info.width, x, y)] == 100)
+        else if (map.map.data[MAP_IDX(map_.map.info.width, x, y)] == 100)
         {
-          cell.update(true, smap.map2world(x, y));
+          cell.update(true, smap->map2world(x, y));
         }
-        else if (map_.map.data[MAP_IDX(map_.map.info.width, x, y)] == 0)
+        else if (map.map.data[MAP_IDX(map_.map.info.width, x, y)] == 0)
         {
           cell.update(false, GMapping::Point(0, 0));
         }
       }
     }
-
-    //make sure to set the header information on the map
-    map_.map.header.stamp = ros::Time::now();
-    map_.map.header.frame_id = tf_.resolve(map_frame_);
-
-    sst_.publish(map_.map);
-    sstm_.publish(map_.map.info);
+    ROS_INFO("convert ok...");
   }
   void updateMap(const sensor_msgs::LaserScan &scan);
   bool getOdomPose(GMapping::OrientedPoint &gmap_pose, const ros::Time &t);

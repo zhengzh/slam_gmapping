@@ -254,6 +254,9 @@ void SlamGMapping::init()
 
   if(!private_nh_.getParam("pure_localization", pure_localization_))
     pure_localization_ = false;
+
+  if(!private_nh_.getParam("static_map_filename", static_map_filename_))
+    static_map_filename_ = "";
 }
 
 // void SlamGMapping::map_received()
@@ -523,13 +526,18 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
   gsp_->setMotionModelParameters(srr_, srt_, str_, stt_);
   gsp_->setUpdateDistances(linearUpdate_, angularUpdate_, resampleThreshold_);
   gsp_->setUpdatePeriod(temporalUpdate_);
-  gsp_->setgenerateMap(true);
-  gsp_->setpureLocalization(true);
-  if(!pure_localization_)
+  gsp_->setgenerateMap(false);
+  gsp_->setpureLocalization(false);
+  // if(!pure_localization_)
     gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
                                   delta_, initialPose);
-  else;
-    // gsp_->GridSlamProcessor::init(smap, particles_, initialPose);    
+  // else;
+  //   // gsp_->GridSlamProcessor::init(smap, particles_, initialPose);
+
+  // loadMap(static_map_filename_);
+  // convertMap(static_map_, static_smap_);
+  // gsp_->init(*static_smap_, particles_, initialPose);
+  
   gsp_->setllsamplerange(llsamplerange_);
   gsp_->setllsamplestep(llsamplestep_);
   /// @todo Check these calls; in the gmapping gui, they use
@@ -806,8 +814,4 @@ void SlamGMapping::publishTransform()
   ros::Time tf_expiration = ros::Time::now() + ros::Duration(tf_delay_);
   tfB_->sendTransform( tf::StampedTransform (map_to_odom_, tf_expiration, map_frame_, odom_frame_));
   map_to_odom_mutex_.unlock();
-}
-
-void test() {
-  loadMap()
 }
