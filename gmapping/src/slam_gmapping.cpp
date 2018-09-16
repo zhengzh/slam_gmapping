@@ -129,7 +129,8 @@ Initial map dimensions and resolution:
 SlamGMapping::SlamGMapping():
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
   laser_count_(0), private_nh_("~"), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
-  enable_transform_thread_(true), enable_addScan_(true), static_smap_(NULL)
+  enable_transform_thread_(true), enable_addScan_(true), static_smap_(NULL), initial_pose_sub_(NULL),
+  initial_pose_filter_(NULL)
 {
   seed_ = time(NULL);
   init();
@@ -138,7 +139,7 @@ SlamGMapping::SlamGMapping():
 SlamGMapping::SlamGMapping(ros::NodeHandle& nh, ros::NodeHandle& pnh):
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
   laser_count_(0),node_(nh), private_nh_(pnh), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
-  enable_transform_thread_(true), enable_addScan_(true), static_smap_(NULL)
+  enable_transform_thread_(true), enable_addScan_(true), static_smap_(NULL), initial_pose_sub_(NULL), initial_pose_filter_(NULL)
 {
   seed_ = time(NULL);
   init();
@@ -148,7 +149,7 @@ SlamGMapping::SlamGMapping(long unsigned int seed, long unsigned int max_duratio
   map_to_odom_(tf::Transform(tf::createQuaternionFromRPY( 0, 0, 0 ), tf::Point(0, 0, 0 ))),
   laser_count_(0), private_nh_("~"), scan_filter_sub_(NULL), scan_filter_(NULL), transform_thread_(NULL),
   seed_(seed), tf_(ros::Duration(max_duration_buffer)), enable_transform_thread_(true), enable_addScan_(true),
-  static_smap_(NULL)
+  static_smap_(NULL), initial_pose_sub_(NULL), initial_pose_filter_(NULL)
 {
   init();
 }
@@ -275,6 +276,10 @@ void SlamGMapping::startLiveSlam()
   scan_filter_ = new tf::MessageFilter<sensor_msgs::LaserScan>(*scan_filter_sub_, tf_, odom_frame_, 5);
   scan_filter_->registerCallback(boost::bind(&SlamGMapping::laserCallback, this, _1));
 
+  initial_pose_sub_ = new message_filters::Subscriber<geometry_msgs::PoseWithCovarianceStamped>(node_, "initialpose", 2);
+  initial_pose_filter_ = new tf::MessageFilter<geometry_msgs::PoseWithCovarianceStamped>(*initial_pose_sub_, tf_, map_frame_, 2);
+  initial_pose_filter_->registerCallback(boost::bind(&SlamGMapping::initialPoseCallback, this, _1));
+
   transform_thread_ = new boost::thread(boost::bind(&SlamGMapping::publishLoop, this, transform_publish_period_));
 }
 
@@ -376,6 +381,10 @@ SlamGMapping::~SlamGMapping()
     delete scan_filter_;
   if (scan_filter_sub_)
     delete scan_filter_sub_;
+  if(initial_pose_sub_)
+    delete initial_pose_filter_;
+  if(initial_pose_filter_)
+    delete initial_pose_filter_;
 }
 
 bool
@@ -661,6 +670,22 @@ SlamGMapping::laserCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
     }
   } else
     ROS_DEBUG("cannot process scan");
+}
+
+void
+SlamGMapping::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg)
+{
+  double x = msg->pose.pose.position.x;
+  double y = msg->pose.pose.position.y;
+  double r = tf::getYaw(msg->pose.pose.orientation);
+  GMapping::OrientedPoint initialPose(x, y, r);
+  
+  enable_addScan_ = false;
+  add_scan_mutex_.lock();
+  gsp_->init(*static_smap_, particles_, initialPose);
+  add_scan_mutex_.unlock();
+  enable_addScan_ = true;
+  ROS_INFO( "Setting pose (%.6f): %.3f %.3f %.3f", ros::Time::now().toSec(), x, y, r);
 }
 
 double

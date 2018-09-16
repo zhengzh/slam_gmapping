@@ -20,6 +20,8 @@
 #include "sensor_msgs/LaserScan.h"
 #include "std_msgs/Float64.h"
 #include "nav_msgs/GetMap.h"
+#include "geometry_msgs/PoseWithCovarianceStamped.h"
+#include "geometry_msgs/PointStamped.h"
 #include "tf/transform_listener.h"
 #include "tf/transform_broadcaster.h"
 #include "message_filters/subscriber.h"
@@ -46,6 +48,7 @@ public:
   void publishTransform();
 
   void laserCallback(const sensor_msgs::LaserScan::ConstPtr &scan);
+  void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg);
   bool mapCallback(nav_msgs::GetMap::Request &req,
                    nav_msgs::GetMap::Response &res);
   void publishLoop(double transform_publish_period);
@@ -59,6 +62,9 @@ private:
   tf::TransformListener tf_;
   message_filters::Subscriber<sensor_msgs::LaserScan> *scan_filter_sub_;
   tf::MessageFilter<sensor_msgs::LaserScan> *scan_filter_;
+  message_filters::Subscriber<geometry_msgs::PoseWithCovarianceStamped>* initial_pose_sub_;
+  tf::MessageFilter<geometry_msgs::PoseWithCovarianceStamped>* initial_pose_filter_;
+
   tf::TransformBroadcaster *tfB_;
 
   GMapping::GridSlamProcessor *gsp_;
