@@ -148,13 +148,33 @@ private:
     }
     ROS_INFO("convert ok...");
   }
+
+  inline void restartMapping() {
+    stopThread();
+    GMapping::OrientedPoint initialPose;
+    initialPose = GMapping::OrientedPoint(0.0, 0.0, 0.0);
+    gsp_->GridSlamProcessor::init(particles_, xmin_, ymin_, xmax_, ymax_,
+                                  delta_, initialPose);
+    
+  }
+
+  inline void restartLocalization() {
+    
+  }
+  
   void updateMap(const sensor_msgs::LaserScan &scan);
   bool getOdomPose(GMapping::OrientedPoint &gmap_pose, const ros::Time &t);
   bool initMapper(const sensor_msgs::LaserScan &scan);
   bool addScan(const sensor_msgs::LaserScan &scan, GMapping::OrientedPoint &gmap_pose);
   double computePoseEntropy();
-  void stopThread();
-  void startThread();
+  inline void stopThread() {
+    enable_addScan_ = false;
+    enable_transform_thread_ = false;
+  };
+  inline void startThread() {
+    enable_addScan_ = true;
+    enable_transform_thread_ = true;
+  }
   void processCmd(std::string cmd);
 
   // Parameters used by GMapping

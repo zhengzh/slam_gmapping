@@ -353,7 +353,7 @@ void SlamGMapping::publishLoop(double transform_publish_period){
     return;
 
   ros::Rate r(1.0 / transform_publish_period);
-  while(ros::ok()){
+  while(ros::ok() && enable_transform_thread_){
     publishTransform();
     r.sleep();
   }
@@ -401,6 +401,7 @@ SlamGMapping::getOdomPose(GMapping::OrientedPoint& gmap_pose, const ros::Time& t
                                       yaw);
   return true;
 }
+
 
 bool
 SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
@@ -538,7 +539,6 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
     gsp_->init(*static_smap_, particles_, initialPose);
   }
 
-  
   gsp_->setllsamplerange(llsamplerange_);
   gsp_->setllsamplestep(llsamplestep_);
   /// @todo Check these calls; in the gmapping gui, they use
